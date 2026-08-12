@@ -12,7 +12,7 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 CORS(app, origins='*')
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins='*')
 
 # ===== SQLITE DATABASE =====
 DB_PATH = os.path.join(os.path.dirname(__file__), 'chat.db')

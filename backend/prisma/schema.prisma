@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-py"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  username     String   @unique @db.VarChar(100)
+  company_name String   @db.VarChar(255)
+  created_at   DateTime @default(now())
+  last_active  DateTime @updatedAt
+  
+  messages Message[] @relation("UserMessages")
+  
+  @@index([company_name])
+}
+
+model Message {
+  id              Int      @id @default(autoincrement())
+  company_name    String   @db.VarChar(255)
+  sender_id       Int
+  sender_username String   @db.VarChar(100)
+  message_text    String   @db.Text
+  timestamp       DateTime @default(now())
+  
+  user User @relation("UserMessages", fields: [sender_id], references: [id], onDelete: Cascade)
+  
+  @@index([company_name, timestamp(sort: Desc)])
+}

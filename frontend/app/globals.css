@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== BASE STYLES ===== */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background: linear-gradient(135deg, #eef2ff 0%, #f5f3ff 30%, #fdf2f8 60%, #fce7f3 100%);
+  min-height: 100vh;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #4f46e5; }
+
+/* ===== CUSTOM COMPONENTS ===== */
+@layer components {
+  .card {
+    @apply bg-white/80 backdrop-blur-xl rounded-3xl shadow-2xl p-8 border border-white/30;
+    box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.25);
+  }
+  
+  .btn-primary {
+    @apply px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white 
+           rounded-2xl hover:from-indigo-700 hover:to-purple-700 
+           transition-all duration-300 font-semibold shadow-lg 
+           hover:shadow-indigo-500/40 transform hover:scale-[1.02] 
+           active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+  
+  .input-primary {
+    @apply w-full px-5 py-3.5 rounded-2xl border-2 border-gray-200 
+           focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 
+           outline-none transition-all duration-200 bg-white/50 backdrop-blur-sm;
+  }
+  
+  .message-sent {
+    @apply bg-gradient-to-br from-indigo-500 to-purple-500 text-white 
+           rounded-2xl rounded-br-none px-5 py-3 max-w-[75%] shadow-lg;
+  }
+  
+  .message-received {
+    @apply bg-white/90 backdrop-blur-sm text-gray-800 
+           rounded-2xl rounded-bl-none px-5 py-3 max-w-[75%] shadow-md;
+  }
+}
+
+.gradient-text {
+  @apply bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent;
+}

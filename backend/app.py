@@ -2,11 +2,10 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room
-import pymysql
+import sqlite3
 import os
 from datetime import datetime
 from dotenv import load_dotenv
-import traceback
 
 load_dotenv()
 
@@ -15,142 +14,151 @@ app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 CORS(app, origins='*')
 socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
 
-# Database connection
-def get_db_connection():
-    try:
-        return pymysql.connect(
-            host=os.getenv('DB_HOST', '127.0.0.1'),
-            user=os.getenv('DB_USER', 'dev_user'),
-            password=os.getenv('DB_PASSWORD', 'password123'),
-            database=os.getenv('DB_NAME', 'company_chat'),
-            port=int(os.getenv('DB_PORT', 3306)),
-            cursorclass=pymysql.cursors.DictCursor,
-            autocommit=False
-        )
-    except Exception as e:
-        print(f"❌ Database connection error: {e}")
-        return None
+# ===== SQLITE DATABASE =====
+DB_PATH = os.path.join(os.path.dirname(__file__), 'chat.db')
 
-# Test route
+def init_db():
+    """Create tables if not exists"""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    # Users table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            company_name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Messages table
+    c.execute('''
+        CREATE TABLE IF NOT EXISTS messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            company_name TEXT NOT NULL,
+            sender_id INTEGER NOT NULL,
+            sender_username TEXT NOT NULL,
+            message_text TEXT NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (sender_id) REFERENCES users(id)
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
+    print("✅ SQLite database initialized")
+
+# Initialize database
+init_db()
+
+def get_db():
+    """Get database connection"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+# ===== TEST ROUTE =====
 @app.route('/')
 def home():
     return jsonify({"status": "ok", "message": "Chat System Backend Running"})
 
+# ===== REGISTER API =====
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
         data = request.json
-        print(f"📥 Registration request: {data}")
-        
         username = data.get('username', '').strip()
         company_name = data.get('company_name', '').strip()
         
         if not username or not company_name:
             return jsonify({'error': 'Username and company name required'}), 400
         
-        conn = get_db_connection()
-        if not conn:
-            return jsonify({'error': 'Database connection failed'}), 500
+        conn = get_db()
+        c = conn.cursor()
         
-        try:
-            with conn.cursor() as cursor:
-                # Check if user exists
-                cursor.execute("SELECT id, username, company_name FROM users WHERE username = %s", (username,))
-                user = cursor.fetchone()
-                
-                if user:
-                    return jsonify({
-                        'user_id': user['id'],
-                        'username': user['username'],
-                        'company_name': user['company_name'],
-                        'room_id': user['company_name']
-                    })
-                
-                # Create new user
-                cursor.execute(
-                    "INSERT INTO users (username, company_name) VALUES (%s, %s)",
-                    (username, company_name)
-                )
-                conn.commit()
-                user_id = cursor.lastrowid
-                
-                return jsonify({
-                    'user_id': user_id,
-                    'username': username,
-                    'company_name': company_name,
-                    'room_id': company_name
-                }), 201
-                
-        except Exception as e:
-            print(f"❌ Database error: {e}")
-            print(traceback.format_exc())
-            return jsonify({'error': f'Database error: {str(e)}'}), 500
-        finally:
+        # Check if user exists
+        c.execute("SELECT id, username, company_name FROM users WHERE username = ?", (username,))
+        user = c.fetchone()
+        
+        if user:
             conn.close()
-            
+            return jsonify({
+                'user_id': user['id'],
+                'username': user['username'],
+                'company_name': user['company_name'],
+                'room_id': user['company_name']
+            })
+        
+        # Create new user
+        c.execute(
+            "INSERT INTO users (username, company_name) VALUES (?, ?)",
+            (username, company_name)
+        )
+        conn.commit()
+        user_id = c.lastrowid
+        conn.close()
+        
+        return jsonify({
+            'user_id': user_id,
+            'username': username,
+            'company_name': company_name,
+            'room_id': company_name
+        }), 201
+        
     except Exception as e:
         print(f"❌ Registration error: {e}")
-        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
+# ===== GET MESSAGES =====
 @app.route('/api/messages/<company_name>', methods=['GET'])
 def get_messages(company_name):
     try:
-        conn = get_db_connection()
-        if not conn:
-            return jsonify([]), 200
-            
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    """SELECT id, sender_id, sender_username, message_text, timestamp 
-                       FROM messages 
-                       WHERE company_name = %s 
-                       ORDER BY timestamp DESC 
-                       LIMIT 100""",
-                    (company_name,)
-                )
-                messages = cursor.fetchall()
-                messages.reverse()
-                
-                return jsonify([{
-                    'id': m['id'],
-                    'sender_id': m['sender_id'],
-                    'sender_username': m['sender_username'],
-                    'message_text': m['message_text'],
-                    'timestamp': m['timestamp'].isoformat() if m['timestamp'] else None
-                } for m in messages])
-        finally:
-            conn.close()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, sender_id, sender_username, message_text, timestamp "
+            "FROM messages WHERE company_name = ? ORDER BY timestamp DESC LIMIT 100",
+            (company_name,)
+        )
+        messages = c.fetchall()
+        conn.close()
+        
+        # Reverse to show oldest first
+        messages = list(messages)[::-1]
+        
+        return jsonify([{
+            'id': m['id'],
+            'sender_id': m['sender_id'],
+            'sender_username': m['sender_username'],
+            'message_text': m['message_text'],
+            'timestamp': m['timestamp']
+        } for m in messages])
+        
     except Exception as e:
         print(f"❌ Error fetching messages: {e}")
         return jsonify([]), 200
 
+# ===== GET ONLINE USERS =====
 @app.route('/api/online/<company_name>', methods=['GET'])
 def get_online_users(company_name):
     try:
-        conn = get_db_connection()
-        if not conn:
-            return jsonify([]), 200
-            
-        try:
-            with conn.cursor() as cursor:
-                cursor.execute(
-                    "SELECT id, username FROM users WHERE company_name = %s",
-                    (company_name,)
-                )
-                users = cursor.fetchall()
-                return jsonify([{
-                    'user_id': u['id'],
-                    'username': u['username']
-                } for u in users])
-        finally:
-            conn.close()
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("SELECT id, username FROM users WHERE company_name = ?", (company_name,))
+        users = c.fetchall()
+        conn.close()
+        
+        return jsonify([{
+            'user_id': u['id'],
+            'username': u['username']
+        } for u in users])
+        
     except Exception as e:
         print(f"❌ Error fetching users: {e}")
         return jsonify([]), 200
 
-# Socket.IO events
+# ===== SOCKET.IO EVENTS =====
 @socketio.on('connect')
 def handle_connect():
     print('✅ Client connected')
@@ -167,7 +175,19 @@ def handle_join_room(data):
 @socketio.on('send_message')
 def handle_send_message(data):
     print(f"💬 Message: {data}")
+    
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO messages (company_name, sender_id, sender_username, message_text) VALUES (?, ?, ?, ?)",
+        (data['company_name'], data['sender_id'], data['username'], data['text'])
+    )
+    conn.commit()
+    conn.close()
+    
+    emit('receive_message', data, room=data['company_name'])
 
+# ===== RUN SERVER =====
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     print(f"🚀 Server running on port {port}")

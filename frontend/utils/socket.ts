@@ -11,20 +11,29 @@ interface UserData {
 }
 
 export const initializeSocket = (userData: UserData): any => {
-  // ✅ CORRECT BACKEND URL
+  // ✅ USE THIS EXACT URL - Your backend URL
   const BACKEND_URL = 'https://chat-system-avx4.onrender.com'
+  
+  console.log('🔌 Initializing socket with URL:', BACKEND_URL)
   
   if (!socket) {
     socket = io(BACKEND_URL, {
-      transports: ['websocket'],
+      transports: ['websocket', 'polling'],  // Polling fallback
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 10,
+      reconnectionAttempts: 20,
       reconnectionDelay: 1000,
-      forceNew: true,
+      reconnectionDelayMax: 5000,
     })
-    console.log('🔌 Socket connecting to:', BACKEND_URL)
   }
+
+  socket.on('connect', () => {
+    console.log('✅ Socket connected!')
+  })
+
+  socket.on('connect_error', (error: any) => {
+    console.error('❌ Socket connection error:', error)
+  })
 
   socket.emit('join_room', {
     user_id: userData.user_id,

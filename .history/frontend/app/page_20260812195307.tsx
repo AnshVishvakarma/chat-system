@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { registerUser } from '@/utils/api'
 import { initializeSocket } from '@/utils/socket'
-import { MessageSquare, Sparkles, ArrowRight, Building2, Users , Send } from 'lucide-react'
+import { MessageSquare, Sparkles, ArrowRight, Building2, Users } from 'lucide-react'
 
 export default function Home() {
   const router = useRouter()

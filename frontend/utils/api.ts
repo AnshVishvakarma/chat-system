@@ -1,7 +1,7 @@
 
 import axios from 'axios'
 
-const API_BASE = 'https://chat-system-avx4.onrender.com/api'
+const API_BASE = 'https://chat-system-avx4.onrender.com/api' // Backend URL
 
 export interface User {
   user_id: number
@@ -19,11 +19,16 @@ export interface Message {
 }
 
 export const registerUser = async (username: string, company_name: string): Promise<User> => {
-  const response = await axios.post(`${API_BASE}/register`, {
-    username,
-    company_name,
-  })
-  return response.data
+  try {
+    const response = await axios.post(`${API_BASE}/register`, {
+      username,
+      company_name,
+    })
+    return response.data
+  } catch (error) {
+    console.error('Registration API error:', error)
+    throw new Error('Registration failed')
+  }
 }
 
 export const getMessages = async (company_name: string): Promise<Message[]> => {

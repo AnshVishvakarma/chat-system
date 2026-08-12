@@ -11,8 +11,11 @@ interface UserData {
 }
 
 export const initializeSocket = (userData: UserData): any => {
+  // ✅ CORRECT BACKEND URL
+  const BACKEND_URL = 'https://chat-system-avx4.onrender.com'
+  
   if (!socket) {
-    socket = io('https://chat-system-avx4.onrender.com', {  // Backend URL
+    socket = io(BACKEND_URL, {
       transports: ['websocket'],
       autoConnect: true,
       reconnection: true,
@@ -20,6 +23,7 @@ export const initializeSocket = (userData: UserData): any => {
       reconnectionDelay: 1000,
       forceNew: true,
     })
+    console.log('🔌 Socket connecting to:', BACKEND_URL)
   }
 
   socket.emit('join_room', {

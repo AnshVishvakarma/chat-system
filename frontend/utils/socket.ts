@@ -1,5 +1,5 @@
-import io from 'socket.io-client'
-import type { Socket } from 'socket.io-client'
+
+import { io, Socket } from 'socket.io-client'
 
 let socket: Socket | null = null
 
@@ -16,17 +16,18 @@ export const initializeSocket = (userData: UserData): Socket => {
       transports: ['websocket'],
       autoConnect: true,
       reconnection: true,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
       reconnectionDelay: 1000,
+      forceNew: true,
     })
   }
-  
+
   socket.emit('join_room', {
     user_id: userData.user_id,
     username: userData.username,
     company_name: userData.company_name,
   })
-  
+
   return socket
 }
 

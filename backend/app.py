@@ -12,17 +12,14 @@ load_dotenv()
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key')
 CORS(app, origins='*')
-socketio = SocketIO(app, cors_allowed_origins='*', async_mode='threading')
+socketio = SocketIO(app, cors_allowed_origins='*', async_mode='eventlet')
 
 # ===== SQLITE DATABASE =====
 DB_PATH = os.path.join(os.path.dirname(__file__), 'chat.db')
 
 def init_db():
-    """Create tables if not exists"""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    
-    # Users table
     c.execute('''
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -31,8 +28,6 @@ def init_db():
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    
-    # Messages table
     c.execute('''
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,26 +39,21 @@ def init_db():
             FOREIGN KEY (sender_id) REFERENCES users(id)
         )
     ''')
-    
     conn.commit()
     conn.close()
     print("✅ SQLite database initialized")
 
-# Initialize database
 init_db()
 
 def get_db():
-    """Get database connection"""
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
 
-# ===== TEST ROUTE =====
 @app.route('/')
 def home():
     return jsonify({"status": "ok", "message": "Chat System Backend Running"})
 
-# ===== REGISTER API =====
 @app.route('/api/register', methods=['POST'])
 def register():
     try:
@@ -76,8 +66,6 @@ def register():
         
         conn = get_db()
         c = conn.cursor()
-        
-        # Check if user exists
         c.execute("SELECT id, username, company_name FROM users WHERE username = ?", (username,))
         user = c.fetchone()
         
@@ -90,7 +78,6 @@ def register():
                 'room_id': user['company_name']
             })
         
-        # Create new user
         c.execute(
             "INSERT INTO users (username, company_name) VALUES (?, ?)",
             (username, company_name)
@@ -110,7 +97,6 @@ def register():
         print(f"❌ Registration error: {e}")
         return jsonify({'error': str(e)}), 500
 
-# ===== GET MESSAGES =====
 @app.route('/api/messages/<company_name>', methods=['GET'])
 def get_messages(company_name):
     try:
@@ -123,8 +109,6 @@ def get_messages(company_name):
         )
         messages = c.fetchall()
         conn.close()
-        
-        # Reverse to show oldest first
         messages = list(messages)[::-1]
         
         return jsonify([{
@@ -139,7 +123,6 @@ def get_messages(company_name):
         print(f"❌ Error fetching messages: {e}")
         return jsonify([]), 200
 
-# ===== GET ONLINE USERS =====
 @app.route('/api/online/<company_name>', methods=['GET'])
 def get_online_users(company_name):
     try:
@@ -158,7 +141,6 @@ def get_online_users(company_name):
         print(f"❌ Error fetching users: {e}")
         return jsonify([]), 200
 
-# ===== SOCKET.IO EVENTS =====
 @socketio.on('connect')
 def handle_connect():
     print('✅ Client connected')
@@ -187,7 +169,6 @@ def handle_send_message(data):
     
     emit('receive_message', data, room=data['company_name'])
 
-# ===== RUN SERVER =====
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
     print(f"🚀 Server running on port {port}")

@@ -1,0 +1,22 @@
+
+
+cat > nixpacks.toml << 'EOF'
+[phases.setup]
+nixPkgs = ["nodejs", "python311"]
+
+[phases.install]
+cmds = [
+  "cd frontend && npm install",
+  "pip install -r backend/requirements.txt"
+]
+
+[phases.build]
+cmds = [
+  "cd frontend && npm run build"
+]
+
+[start]
+cmd = "cd backend && gunicorn --worker-class eventlet -w 1 app:app & cd frontend && npm start"
+
+[build]
+builder = "NIXPACKS"

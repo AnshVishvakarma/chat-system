@@ -1,5 +1,6 @@
 
-import { io, Socket } from 'socket.io-client'
+import io from 'socket.io-client'
+import type { Socket } from 'socket.io-client'
 
 let socket: Socket | null = null
 
@@ -12,7 +13,7 @@ interface UserData {
 
 export const initializeSocket = (userData: UserData): Socket => {
   if (!socket) {
-    socket = io('http://localhost:5000', {
+    socket = io('https://chat-system-avx4.onrender.com', {
       transports: ['websocket'],
       autoConnect: true,
       reconnection: true,

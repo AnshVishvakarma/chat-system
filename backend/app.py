@@ -141,6 +141,7 @@ def get_online_users(company_name):
         print(f"❌ Error fetching users: {e}")
         return jsonify([]), 200
 
+# ===== SOCKET.IO EVENTS =====
 @socketio.on('connect')
 def handle_connect():
     print('✅ Client connected')
@@ -152,22 +153,52 @@ def handle_disconnect():
 @socketio.on('join_room')
 def handle_join_room(data):
     print(f"🔵 Join room: {data}")
-    join_room(data.get('company_name'))
+    room = data.get('company_name')
+    if room:
+        join_room(room)
+        print(f"✅ Joined room: {room}")
 
 @socketio.on('send_message')
 def handle_send_message(data):
-    print(f"💬 Message: {data}")
+    print(f"💬 Message received: {data}")
     
-    conn = get_db()
-    c = conn.cursor()
-    c.execute(
-        "INSERT INTO messages (company_name, sender_id, sender_username, message_text) VALUES (?, ?, ?, ?)",
-        (data['company_name'], data['sender_id'], data['username'], data['text'])
-    )
-    conn.commit()
-    conn.close()
+    company_name = data.get('company_name')
+    sender_id = data.get('sender_id')
+    username = data.get('username')
+    text = data.get('text', '').strip()
     
-    emit('receive_message', data, room=data['company_name'])
+    if not all([company_name, sender_id, username, text]):
+        print("❌ Missing fields in message")
+        return
+    
+    try:
+        # Save to database
+        conn = get_db()
+        c = conn.cursor()
+        c.execute(
+            "INSERT INTO messages (company_name, sender_id, sender_username, message_text) VALUES (?, ?, ?, ?)",
+            (company_name, sender_id, username, text)
+        )
+        conn.commit()
+        conn.close()
+        print(f"✅ Message saved to database: {text}")
+        
+        # Prepare response
+        response_data = {
+            'id': 1,  # SQLite doesn't return ID easily, we can ignore
+            'sender_id': sender_id,
+            'sender_username': username,
+            'message_text': text,
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        # Broadcast to room
+        print(f"📤 Broadcasting to room: {company_name}")
+        emit('receive_message', response_data, room=company_name)
+        print("✅ Message broadcasted successfully")
+        
+    except Exception as e:
+        print(f"❌ Error in send_message: {e}")
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5000))
